@@ -39,7 +39,7 @@ module TT_Nibbler_interface (
 	logic 		cpu_clk;
 	logic 		reset;
 
-	SR_Nibbler (
+	SR_Nibbler srnib0 (
 		.instruction(instruction_sr),
 		.i_nibble_7({io_in, in[7:5]}),
 		.clk(cpu_clk),
