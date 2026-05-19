@@ -61,7 +61,7 @@ module tt_um_sr_nibbler_srb2149 (
 	assign uio_oe[7:1] = '1;
 	
 	//Unused
-	assign uio_out[0] == '0;
+	assign uio_out[0] = '0;
 	wire _unused = &{uio_in[7:1], 1'b0};
 
 endmodule
