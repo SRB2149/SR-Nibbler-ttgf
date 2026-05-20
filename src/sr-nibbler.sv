@@ -335,7 +335,6 @@ module DMEM (
 		begin
 		end
 			case (nibble_regs_ext[6][1:0])
-			begin
 				2'd0 : begin //Bitwise AND
 					MM_ALU_result = a & b;
 				end
@@ -351,7 +350,7 @@ module DMEM (
 				2'd3 : begin //Bitwise NOT
 					MM_ALU_result = ~a;
 				end
-			end
+			endcase
 		end
 		else if (nibble_regs_ext[6][3:2] == 2'b01)
 		begin //Multiplier with shiftable output
@@ -360,7 +359,6 @@ module DMEM (
 		else if (nibble_regs_ext[6][3:2] == 2'b10)
 		begin
 			case (nibble_regs_ext[6][1:0])
-			begin
 				2'd0 : begin //Set 0 if A > B
 					MM_ALU_result = (a > b) ? '0 : '1;
 				end
@@ -376,7 +374,7 @@ module DMEM (
 				2'd3 : begin //Set 0 if A <= B
 					MM_ALU_result = (a <= b) ? '0 : '1;
 				end
-			end
+			endcase
 		end
 	end
 
