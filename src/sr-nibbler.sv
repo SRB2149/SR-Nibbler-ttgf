@@ -54,7 +54,7 @@ module SR_Nibbler (
 	
 	//Control signals (from control unit)
 	logic [8:0] jump_addr;
-	logic [2:0] dmem_addr;
+	logic [3:0] dmem_addr;
 	logic [1:0] r1_addr;
 	logic [1:0] r2_addr;
 	logic [1:0] w_addr;
@@ -217,7 +217,7 @@ endmodule
 module DMEM (
 	input	logic [3:0] data_in,	// Data to be written to DMEM[addr]
 	input	logic [3:0] i_nibble_7,	// Memory mapped input nibble (DMEM[7])
-	input	logic [2:0] addr,		// Address to read/write at
+	input	logic [3:0] addr,		// Address to read/write at
 	input 	logic		write_en,	// Write enable signal
 	input 	logic		read_en,	// Read enable signal
 	input 	logic		clk,		// Clock (positive edge triggered)
@@ -228,8 +228,10 @@ module DMEM (
 	output	logic [3:0] o_nibble3	// Data from DMEM[3][2:0]
 );
 	
-	logic [3:0] nibbles [8];
+	logic [3:0] nibbles [16];
 	logic [3:0] nibble_regs [6];
+	logic [3:0] nibble_regs_ext [7];
+	logic [3:0] MM_ALU_result;
 	logic [2:0] shift_reg;
 	
 	//Input nibble
@@ -237,12 +239,24 @@ module DMEM (
 	
 	//Arithmetic right shift
 	assign nibbles[6] = {shift_reg[2], shift_reg};
+	
+	//Normal nibbles
 	assign nibbles[5] = nibble_regs[5];
 	assign nibbles[4] = nibble_regs[4];
 	assign nibbles[3] = nibble_regs[3];
 	assign nibbles[2] = nibble_regs[2];
 	assign nibbles[1] = nibble_regs[1];
 	assign nibbles[0] = nibble_regs[0];
+	
+	//DMEM EXTENSION
+	assign nibbles[15] = MM_ALU_result;
+	assign nibbles[14] = nibble_regs_ext[6];
+	assign nibbles[13] = nibble_regs_ext[5];
+	assign nibbles[12] = nibble_regs_ext[4];
+	assign nibbles[11] = nibble_regs_ext[3];
+	assign nibbles[10] = nibble_regs_ext[2];
+	assign nibbles[9] = nibble_regs_ext[1];
+	assign nibbles[8] = nibble_regs_ext[0];
 	
 	//Output nibbles
 	assign o_nibble5 = nibbles[5];
@@ -260,6 +274,14 @@ module DMEM (
 			nibble_regs[4] <= '0;
 			nibble_regs[5] <= '0;
 			
+			nibble_regs_ext[0] <= '0;
+			nibble_regs_ext[1] <= '0;
+			nibble_regs_ext[2] <= '0;
+			nibble_regs_ext[3] <= '0;
+			nibble_regs_ext[4] <= '0;
+			nibble_regs_ext[5] <= '0;
+			nibble_regs_ext[6] <= '0;
+			
 			shift_reg <= '0;
 		end
 		else
@@ -271,12 +293,16 @@ module DMEM (
 						/* Do nothing */
 					end
 					
-					3'd0, 3'd1, 3'd2, 3'd3, 3'd4, 3'd5 : begin
-						nibble_regs[addr] <= data_in;
+					4'd0, 4'd1, 4'd2, 4'd3, 4'd4, 4'd5: begin
+						nibble_regs[addr[2:0]] <= data_in;
 					end
 					
-					3'd6 : begin
+					4'd6 : begin
 						shift_reg <= data_in[3:1];
+					end
+					
+					4'd8, 4'd9, 4'd10, 4'd11, 4'd12, 4'd13, 4'd14 : begin
+						nibble_regs_ext[addr[2:0]] <= data_in;
 					end
 				endcase
 			end
@@ -290,6 +316,67 @@ module DMEM (
 		if (read_en)
 		begin
 			data_out = nibbles[addr];
+		end
+	end
+	
+	//DMEM MEMORY MAPPED ALU EXTENSION
+	logic [3:0] a, b;
+	logic [7:0] mul_result;
+	
+	always_comb
+	begin
+		MM_ALU_result = '0;
+		a = nibble_regs_ext[5];
+		b = nibble_regs_ext[4];
+		
+		mul_result = a * b;
+		
+		if (nibble_regs_ext[6][3:2] == 2'b00)
+		begin
+		end
+			case (nibble_regs_ext[6][1:0])
+			begin
+				2'd0 : begin //Bitwise AND
+					MM_ALU_result = a & b;
+				end
+				
+				2'd1 : begin //Bitwise OR
+					MM_ALU_result = a | b;
+				end
+				
+				2'd2 : begin //Bitwise XOR
+					MM_ALU_result = a ^ b;
+				end
+				
+				2'd3 : begin //Bitwise NOT
+					MM_ALU_result = ~a;
+				end
+			end
+		end
+		else if (nibble_regs_ext[6][3:2] == 2'b01)
+		begin //Multiplier with shiftable output
+			MM_ALU_result = {mul_result >> nibble_regs_ext[6][1:0]}[3:0];
+		end
+		else if (nibble_regs_ext[6][3:2] == 2'b10)
+		begin
+			case (nibble_regs_ext[6][1:0])
+			begin
+				2'd0 : begin //Set 0 if A > B
+					MM_ALU_result = (a > b) ? '0 : '1;
+				end
+				
+				2'd1 : begin //Set 0 if A < B
+					MM_ALU_result = (a < b) ? '0 : '1;
+				end
+				
+				2'd2 : begin //Set 0 if A >= B
+					MM_ALU_result = (a >= b) ? '0 : '1;
+				end
+				
+				2'd3 : begin //Set 0 if A <= B
+					MM_ALU_result = (a <= b) ? '0 : '1;
+				end
+			end
 		end
 	end
 
@@ -356,7 +443,7 @@ module ControlUnit (
 	input	logic [8:0] instruction,	// The instruction to decode
 	output	logic [5:0] jump_addr,		// The address to jump/branch to
 	output	logic [3:0] imm_value,		// Immediate data output to W bus
-	output	logic [2:0] dmem_addr,		// The address to read/write at in DMEM
+	output	logic [3:0] dmem_addr,		// The address to read/write at in DMEM
 	output	logic [1:0] r1_addr,		// The GPR R1 address
 	output	logic [1:0] r2_addr,		// The GPR R2 address
 	output	logic [1:0] w_addr,			// The GPR W address
@@ -427,7 +514,7 @@ module ControlUnit (
 		
 		jump_addr = instruction[5:0];
 		imm_value = load_imm ? instruction[3:0] : '0;
-		dmem_addr = instruction[2:0];
+		dmem_addr = instruction[3:0];
 		r1_addr = instruction[5:4];
 		r2_addr = instruction[3:2];
 		w_addr = instruction[1:0];
