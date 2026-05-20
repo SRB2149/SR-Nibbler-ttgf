@@ -53,7 +53,7 @@ module SR_Nibbler (
 	logic 		branch_en; 
 	
 	//Control signals (from control unit)
-	logic [8:0] jump_addr;
+	logic [5:0] jump_addr;
 	logic [3:0] dmem_addr;
 	logic [1:0] r1_addr;
 	logic [1:0] r2_addr;
@@ -353,7 +353,7 @@ module DMEM (
 		end
 		else if (nibble_regs_ext[6][3:2] == 2'b01)
 		begin //Multiplier with shiftable output
-			MM_ALU_result = {mul_result >> nibble_regs_ext[6][1:0]}[3:0];
+			MM_ALU_result = 4'(mul_result >> nibble_regs_ext[6][1:0]);
 		end
 		else if (nibble_regs_ext[6][3:2] == 2'b10)
 		begin
