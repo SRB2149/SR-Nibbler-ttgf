@@ -333,7 +333,6 @@ module DMEM (
 		
 		if (nibble_regs_ext[6][3:2] == 2'b00)
 		begin
-		end
 			case (nibble_regs_ext[6][1:0])
 				2'd0 : begin //Bitwise AND
 					MM_ALU_result = a & b;
